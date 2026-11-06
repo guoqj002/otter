@@ -1,0 +1,16 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    avoid_print: true
+    use_super_parameters: true
+
+analyzer:
+  errors:
+    invalid_annotation_target: ignore
+  # 注意：不要排除 *.g.dart —— Drift 使用 part 指令，
+  # 排除生成文件会导致宿主文件整体解析失败。
+  exclude:
+    - build/**
+    - android/**

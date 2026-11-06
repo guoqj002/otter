@@ -1,0 +1,48 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.lock.bak
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Android
+android/.gradle/
+android/captures/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/key.properties
+*.jks
+*.keystore
+
+# iOS / macOS（如后续新增）
+ios/Pods/
+ios/.symlinks/
+macos/Pods/
+
+# 构建产物与安装包（体积大，不进仓库）
+*.apk
+*.aab
+*.ipa
+*.jar
+
+# 调试/截图产物
+.shots/
+design/
+build_output.txt
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
