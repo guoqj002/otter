@@ -68,7 +68,7 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
               ),
               const SizedBox(height: 16),
               Text(
-                '习惯打卡 + 记账，帮你管好每一天。\n完全离线，不用注册，数据只在你的手机上。',
+                '习惯打卡 + 记账，帮你管好每一天。\n不用注册，数据只在你的手机上。',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: scheme.onSurfaceVariant,
                       height: 1.6,
@@ -120,9 +120,9 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
               ),
               const SizedBox(height: 16),
               _FeatureRow(
-                icon: Icons.wifi_off_rounded,
-                title: '离线可用',
-                subtitle: '无网络权限，无账号，数据留在本机',
+                icon: Icons.smart_toy_outlined,
+                title: 'AI 理财管家小獭',
+                subtitle: '可对话的数字人管家，数据留在本机',
               ),
               const Spacer(flex: 2),
               SizedBox(

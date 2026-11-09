@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../application/providers/ai_providers.dart';
 import '../../application/providers/data_providers.dart';
 import '../../application/providers/expense_providers.dart';
 import '../../application/providers/invest_providers.dart';
@@ -107,6 +108,9 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
+          const SectionTitle('AI 助手'),
+          const _AiSection(),
+          const SizedBox(height: 20),
           const SectionTitle('安全'),
           const _SecuritySection(),
           const SizedBox(height: 20),
@@ -154,7 +158,7 @@ class SettingsPage extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.info_outline_rounded),
                   title: const Text('版本'),
-                  trailing: Text('2.4.4',
+                  trailing: Text('2.5.0',
                       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
                 ),
               ],
@@ -534,5 +538,150 @@ class _SecuritySection extends ConsumerWidget {
     }
     await ref.read(lockProvider.notifier).setBiometric(false);
     if (context.mounted) _toast(context, '指纹解锁已关闭');
+  }
+}
+
+/// AI 助手配置区：接口地址 / API Key / 模型名（OpenAI 兼容）
+class _AiSection extends ConsumerWidget {
+  const _AiSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(aiConfigProvider);
+    final configured = config.isConfigured;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(
+              Icons.smart_toy_rounded,
+              color: configured ? scheme.primary : null,
+            ),
+            title: const Text('小獭 AI 管家'),
+            subtitle: Text(configured
+                ? '已配置 · 底部导航「小獭」可对话'
+                : '未配置 · 配置后可与 AI 理财管家对话'),
+            trailing: Icon(
+              configured
+                  ? Icons.check_circle_rounded
+                  : Icons.error_outline_rounded,
+              color: configured ? scheme.primary : scheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.link_rounded),
+            title: const Text('API 地址'),
+            subtitle: Text(config.baseUrl),
+            trailing: const Icon(Icons.edit_outlined, size: 18),
+            onTap: () => _editField(
+              context,
+              title: 'API 地址',
+              hint: 'OpenAI 兼容接口地址',
+              initial: config.baseUrl,
+              keyboardType: TextInputType.url,
+              onSave: (v) =>
+                  ref.read(aiConfigProvider.notifier).setBaseUrl(v),
+            ),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.key_rounded),
+            title: const Text('API Key'),
+            subtitle: Text(
+              config.apiKey.isEmpty
+                  ? '未设置'
+                  : '${config.apiKey.substring(0, config.apiKey.length > 8 ? 8 : config.apiKey.length)}••••••',
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
+            trailing: const Icon(Icons.edit_outlined, size: 18),
+            onTap: () => _editField(
+              context,
+              title: 'API Key',
+              hint: '服务商控制台生成的密钥，仅存本机',
+              initial: config.apiKey,
+              obscure: true,
+              onSave: (v) => ref.read(aiConfigProvider.notifier).setApiKey(v),
+            ),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.psychology_rounded),
+            title: const Text('模型名'),
+            subtitle: Text(config.model),
+            trailing: const Icon(Icons.edit_outlined, size: 18),
+            onTap: () => _editField(
+              context,
+              title: '模型名',
+              hint: '如 gpt-4o-mini / deepseek-chat / qwen-plus',
+              initial: config.model,
+              onSave: (v) => ref.read(aiConfigProvider.notifier).setModel(v),
+            ),
+          ),
+          const Divider(height: 1, indent: 56),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 15, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '支持 OpenAI 兼容接口（OpenAI / DeepSeek / 通义千问 / Kimi 等），'
+                    'Key 仅保存在本机，对话内容会发送给你配置的服务商。',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editField(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    required String initial,
+    required ValueChanged<String> onSave,
+    bool obscure = false,
+    TextInputType? keyboardType,
+  }) async {
+    final controller = TextEditingController(text: initial)
+      // 打开时全选旧值，直接输入即可整体替换
+      ..selection = TextSelection(baseOffset: 0, extentOffset: initial.length);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: obscure,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(hintText: hint),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    final value = controller.text;
+    if (saved == true && value != initial) onSave(value);
   }
 }

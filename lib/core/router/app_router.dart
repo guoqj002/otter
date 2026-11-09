@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/ai/otter_chat_page.dart';
 import '../../presentation/expense/expense_page.dart';
 import '../../presentation/home/home_page.dart';
 import '../../presentation/habit/habit_edit_page.dart';
@@ -52,6 +53,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/invest',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: InvestPage()),
+          ),
+          GoRoute(
+            path: '/ai',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: OtterChatPage()),
           ),
           GoRoute(
             path: '/stats',

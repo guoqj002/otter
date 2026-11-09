@@ -10,8 +10,9 @@ class MainShell extends StatelessWidget {
     final location = GoRouterState.of(context).uri.path;
     if (location.startsWith('/expense')) return 1;
     if (location.startsWith('/invest')) return 2;
-    if (location.startsWith('/stats')) return 3;
-    if (location.startsWith('/settings')) return 4;
+    if (location.startsWith('/ai')) return 3;
+    if (location.startsWith('/stats')) return 4;
+    if (location.startsWith('/settings')) return 5;
     return 0;
   }
 
@@ -39,8 +40,10 @@ class MainShell extends StatelessWidget {
             case 2:
               context.go('/invest');
             case 3:
-              context.go('/stats');
+              context.go('/ai');
             case 4:
+              context.go('/stats');
+            case 5:
               context.go('/settings');
           }
         },
@@ -59,6 +62,11 @@ class MainShell extends StatelessWidget {
             icon: Icon(Icons.trending_up_outlined),
             selectedIcon: Icon(Icons.trending_up_rounded),
             label: '理财',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.forum_outlined),
+            selectedIcon: Icon(Icons.forum_rounded),
+            label: '小獭',
           ),
           NavigationDestination(
             icon: Icon(Icons.pie_chart_outline_rounded),

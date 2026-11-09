@@ -1,7 +1,7 @@
 name: fitstreak
-description: "FitStreak - 健身习惯打卡，离线可用，无需注册。"
+description: "水獭管家 - 习惯打卡 + 记账 + 理财 + AI 管家的个人 App，本地优先。"
 publish_to: 'none'
-version: 2.4.4+16
+version: 2.5.0+17
 
 environment:
   sdk: ^3.13.0
@@ -41,6 +41,7 @@ dependencies:
   file_picker: ^13.3.2
   local_auth: ^3.0.2
   crypto: ^3.0.8
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
