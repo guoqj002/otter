@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../application/providers/ai_providers.dart';
 import '../../application/services/ai_service.dart';
+import '../../application/services/otter_actions.dart';
 
-/// 「小獭」AI 对话页：数字人家庭理财管家
+/// 「小獭」AI 对话页：数字人家庭助手（理财 · 习惯 · 饮食）
 class OtterChatPage extends ConsumerStatefulWidget {
   const OtterChatPage({super.key});
 
@@ -16,6 +17,10 @@ class OtterChatPage extends ConsumerStatefulWidget {
 class _OtterChatPageState extends ConsumerState<OtterChatPage> {
   final _input = TextEditingController();
   final _focus = FocusNode();
+
+  /// 已执行 / 已忽略的指令 key（消息序号:指令序号），仅页面内存态
+  final _done = <String>{};
+  final _ignored = <String>{};
 
   @override
   void dispose() {
@@ -32,6 +37,25 @@ class _OtterChatPageState extends ConsumerState<OtterChatPage> {
     _input.clear();
     _focus.unfocus();
     ref.read(chatProvider.notifier).send(text, prompt);
+  }
+
+  /// 执行一条指令
+  Future<void> _runAction(int msgIdx, int idx, OtterAction a) async {
+    try {
+      final msg = await ref.read(otterActionExecutorProvider)(a);
+      setState(() => _done.add('$msgIdx:$idx'));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text('执行失败：$e')));
+      }
+    }
   }
 
   @override
@@ -110,7 +134,33 @@ class _OtterChatPageState extends ConsumerState<OtterChatPage> {
                       final idx = messages.length - 1 - i;
                       if (idx < 0) return const _TypingBubble();
                       final m = messages[idx];
-                      return _Bubble(message: m);
+                      final isUser = m.role == 'user';
+                      // AI 回复：解析指令块，正文之外渲染确认卡片
+                      final actions =
+                          isUser ? const <OtterAction>[] : OtterAction.parse(m.content);
+                      final body = isUser
+                          ? m.content
+                          : (OtterAction.stripBlocks(m.content).isEmpty
+                              ? '好的，主人～确认一下下面的操作：'
+                              : OtterAction.stripBlocks(m.content));
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Bubble(
+                              message:
+                                  AiMessage(role: m.role, content: body, at: m.at)),
+                          if (!isUser)
+                            for (var k = 0; k < actions.length; k++)
+                              _ActionCard(
+                                action: actions[k],
+                                done: _done.contains('$idx:$k'),
+                                ignored: _ignored.contains('$idx:$k'),
+                                onRun: () => _runAction(idx, k, actions[k]),
+                                onIgnore: () =>
+                                    setState(() => _ignored.add('$idx:$k')),
+                              ),
+                        ],
+                      );
                     },
                   ),
           ),
@@ -133,7 +183,9 @@ class _OtterChatPageState extends ConsumerState<OtterChatPage> {
                       onSubmitted: (_) => _send(),
                       enabled: !chat.sending,
                       decoration: InputDecoration(
-                        hintText: chat.sending ? '小獭思考中…' : '问问小獭，比如“我这个月花得怎么样？”',
+                        hintText: chat.sending
+                            ? '小獭思考中…'
+                            : '记账、理财、习惯，都可以问小獭～',
                         isDense: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
@@ -201,7 +253,7 @@ class _NotConfiguredView extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 '先到「我的 → AI 助手」里选个服务商（DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI），'
-                '填入对应的 API Key，叫醒小獭后它就能帮你分析记账和理财啦。',
+                '填入对应的 API Key，叫醒小獭后它就能帮你管账、看理财、养成好习惯啦。',
                 textAlign: TextAlign.center,
                 style: Theme.of(context)
                     .textTheme
@@ -234,8 +286,8 @@ class _WelcomeView extends StatelessWidget {
   static const _suggestions = [
     '这个月我花得怎么样？',
     '帮我分析一下理财盈亏',
-    '我在哪个分类花得最多？',
-    '给点省钱的小建议吧',
+    '帮我建一个每天喝 8 杯水的习惯',
+    '记一笔：今天午饭花了 25 元',
   ];
 
   @override
@@ -255,7 +307,7 @@ class _WelcomeView extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           Text(
-            '我看过你这个月的账本和理财记录了，\n有什么想问的尽管问我～',
+            '管账、看理财、养成好习惯，都可以找我～\n你的账本和打卡记录我都看过了哦。',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
@@ -364,6 +416,87 @@ class _Bubble extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 指令确认卡片：小獭想做的事，主人点「执行」才生效
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({
+    required this.action,
+    required this.done,
+    required this.ignored,
+    required this.onRun,
+    required this.onIgnore,
+  });
+
+  final OtterAction action;
+  final bool done;
+  final bool ignored;
+  final VoidCallback onRun;
+  final VoidCallback onIgnore;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (icon, accent) = switch (action.type) {
+      OtterActionType.createHabit => (Icons.add_task_rounded, Colors.teal),
+      OtterActionType.addExpense => (Icons.payments_rounded, Colors.orange),
+      OtterActionType.addInvest => (Icons.trending_up_rounded, Colors.indigo),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 34, bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: done ? scheme.primary : accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                done ? '${action.summary}（已执行）' : action.summary,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.3,
+                  color: done || ignored
+                      ? scheme.onSurfaceVariant
+                      : scheme.onSurface,
+                  decoration: ignored ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (!done && !ignored) ...[
+              TextButton(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+                onPressed: onIgnore,
+                child: const Text('忽略'),
+              ),
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                onPressed: onRun,
+                child: const Text('执行'),
+              ),
+            ] else
+              Icon(
+                done ? Icons.check_circle_rounded : Icons.block_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
           ],
         ),
       ),

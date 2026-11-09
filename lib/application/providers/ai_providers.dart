@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/ai_service.dart';
+import '../services/otter_actions.dart';
+import '../../core/utils/date_utils.dart';
 import '../../domain/entities/expense.dart';
+import '../../domain/entities/habit.dart';
 import '../../domain/entities/invest.dart';
+import 'data_providers.dart';
 import 'expense_providers.dart';
 import 'invest_providers.dart';
 
@@ -200,14 +204,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
 }
 
 // ---------------------------------------------------------------------------
-// 财务上下文（系统提示词）
+// 系统提示词（角色 + 指令协议 + 数据快照）
 // ---------------------------------------------------------------------------
 
-/// 读取本月记账 + 理财数据，生成注入给小獭的财务快照
+/// 注入给小獭的完整系统提示词：角色定位、指令协议、
+/// 主人的习惯列表与本月财务快照
 final otterSystemPromptProvider = FutureProvider.autoDispose<String>((ref) async {
   final now = DateTime.now();
   final ym = _ym(now);
 
+  final habits = await ref
+      .watch(habitsProvider.future)
+      .catchError((_) => <HabitModel>[]);
   final expenses = await ref
       .watch(expensesOfMonthProvider(ym).future)
       .catchError((_) => <ExpenseModel>[]);
@@ -252,14 +260,45 @@ final otterSystemPromptProvider = FutureProvider.autoDispose<String>((ref) async
   final balance = income - outcome;
   final net = profit - loss;
 
+  final weekday = Dates.weekdayNames[now.weekday - 1];
+  final dayStr = now.day.toString().padLeft(2, '0');
+  final monthStr = now.month.toString().padLeft(2, '0');
+  final habitsText = habits.isEmpty
+      ? '暂无习惯（可以建议主人创建第一个）'
+      : habits
+          .map((h) => '${h.name}（${h.goalLabel} · ${h.frequencyLabel}）')
+          .join('、');
+
   return '''
-你是「小獭」，App「水獭管家」里的数字人家庭理财管家，一只可爱、认真、值得信赖的卡通水獭。
+你是「小獭」，App「水獭管家」里的数字人家庭助手，一只可爱、认真、值得信赖的卡通水獭。
 
 【你的职责】
-- 用通俗的话帮主人分析收支和理财情况，给出温和、可执行的建议
-- 涉及投资时只做科普与风险提示，不荐股、不预测行情、不承诺收益
-- 你只能看到下面的数据快照，不能修改任何数据；如果主人问的问题超出数据范围，如实说明
-- 金额一律用 ¥，口径与 App 一致：结余为正说明收大于支
+- 家庭理财管家：用通俗的话帮主人分析收支和理财情况，给温和、可执行的建议；涉及投资只做科普与风险提示，不荐股、不预测行情、不承诺收益
+- 健康习惯管理：结合主人现有的习惯，给出坚持建议、打卡鼓励，帮主人设计和优化新习惯
+- 饮食建议：结合支出里的餐饮情况，给出均衡饮食、规律作息等生活化的健康建议
+- 帮主人做事：主人明确要求时，用下面的指令协议创建习惯、记一笔账、记一条理财盈亏
+
+【指令协议】
+主人要你「创建习惯 / 记一笔账 / 记一条理财」时，在回复正文（一两句确认的话）之后输出指令块：用三个反引号紧跟 otter 作为围栏开头（即 ```otter），以单独一行的三个反引号结束，块内一行一条 JSON。例如（三条示例各自独立成块，实际按需输出）：
+```otter
+{"action":"create_habit","name":"早睡","type":"check","frequency":"daily","icon":"sleep","color":2}
+```
+```otter
+{"action":"add_expense","direction":"expense","amount":25.5,"category":"food","note":"午饭","date":"2026-11-09"}
+```
+```otter
+{"action":"add_invest","kind":"stock","amount":300,"direction":"profit","note":"今日盈亏","date":"2026-11-09"}
+```
+字段规则：
+- create_habit：type 取 check（打勾）/ count（计数）/ duration（时长），count 和 duration 必须带 targetValue 和 unit；frequency 取 daily（每天）/ weekly（每周N次，带 weeklyTarget 1-7）/ days（指定星期，weekdays 如 [1,3,5]，1=周一…7=周日）；icon 可选：$kOtterIconKeyHint；color 0-9
+- add_expense：direction 取 expense（支出）/ income（收入）；支出 category：food餐饮 traffic交通 shop购物 fun娱乐 health健康 home居住 other其他；收入 category：salary工资 bonus奖金 invest理财 parttime兼职 redpacket红包 otherin其他
+- add_invest：kind 取 stock股票 fund基金 etf futures期货；amount 是正数金额（元），亏损用 "direction":"loss"
+- 金额一律正数、单位元；date 为 YYYY-MM-DD，缺省就是今天
+- 信息不全时先追问，不要替主人编金额或名称；一次可以输出多条指令
+- 只有主人明确要做这些操作时才输出指令块；分析、闲聊、给建议一律不要输出
+
+【主人的信息（今天是 ${now.year}-$monthStr-$dayStr $weekday）】
+- 主人的习惯：$habitsText
 
 【主人本月（${now.year} 年 ${now.month} 月）的财务快照】
 - 收入合计：¥${_fmtYuan(income)}
@@ -283,3 +322,78 @@ String _kindLabel(String k) => switch (k) {
       'futures' => '期货',
       _ => '其他',
     };
+
+// ---------------------------------------------------------------------------
+// 指令执行（用户在聊天页点「执行」后才会调用）
+// ---------------------------------------------------------------------------
+
+/// 供 UI 调用的执行器：聊天页通过 read 此 provider 拿到执行函数
+final otterActionExecutorProvider =
+    Provider<Future<String> Function(OtterAction)>(
+        (ref) => (a) => executeOtterAction(ref, a));
+
+/// 执行小獭指令并刷新相关数据，返回结果文案（SnackBar 用）
+Future<String> executeOtterAction(Ref ref, OtterAction a) async {
+  final now = DateTime.now().millisecondsSinceEpoch;
+  switch (a.type) {
+    case OtterActionType.createHabit:
+      final repo = ref.read(repoProvider);
+      final name = a.data['name'] as String;
+      // 同名去重，避免 AI 卡片重复执行造成堆积
+      final active = await repo.activeHabits();
+      if (active.any((h) => h.name == name)) {
+        return '已有同名习惯「$name」，未重复创建';
+      }
+      final habit = HabitModel(
+        id: 'h-$now',
+        name: name,
+        iconCode: a.data['iconCode'] as int,
+        colorHex: 0xFF000000 | (a.data['colorHex'] as int),
+        type: a.data['type'] as HabitType,
+        targetValue: a.data['targetValue'] as double?,
+        unit: a.data['unit'] as String?,
+        frequency: a.data['frequency'] as HabitFrequency,
+        weeklyTarget: a.data['weeklyTarget'] as int,
+        weekdaysMask: a.data['weekdaysMask'] as int,
+        sortOrder: now % 100000,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await repo.saveHabit(habit);
+      ref.invalidate(habitsProvider);
+      ref.invalidate(statsProvider);
+      return '已创建习惯「$name」';
+
+    case OtterActionType.addExpense:
+      final model = ExpenseModel(
+        id: 'e-$now',
+        category: a.data['category'] as String,
+        amountCents: a.data['amountCents'] as int,
+        type: a.data['type'] as String,
+        note: a.data['note'] as String?,
+        localDate: a.data['localDate'] as String,
+        createdAt: now,
+      );
+      await ref.read(expenseRepoProvider).add(model);
+      ref.invalidate(expensesOfPeriodProvider);
+      ref.invalidate(expensesOfMonthProvider(model.localDate.substring(0, 7)));
+      ref.invalidate(statsExpensesProvider);
+      return '已记一笔${model.isIncome ? '收入' : '支出'} ¥${_fmtYuan(model.amount)}';
+
+    case OtterActionType.addInvest:
+      final model = InvestModel(
+        id: 'i-$now',
+        kind: a.data['kind'] as String,
+        amountCents: a.data['amountCents'] as int,
+        note: a.data['note'] as String?,
+        localDate: a.data['localDate'] as String,
+        createdAt: now,
+      );
+      await ref.read(investRepoProvider).add(model);
+      ref.invalidate(investListOfPeriodProvider);
+      ref.invalidate(investOfMonthProvider(model.localDate.substring(0, 7)));
+      ref.invalidate(statsInvestProvider);
+      final sign = model.amountCents >= 0 ? '+' : '-';
+      return '已记理财 ${InvestModel.labelOf(model.kind)} $sign¥${_fmtYuan(model.amount)}';
+  }
+}

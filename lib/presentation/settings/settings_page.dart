@@ -560,10 +560,10 @@ class _AiSection extends ConsumerWidget {
               Icons.smart_toy_rounded,
               color: configured ? scheme.primary : null,
             ),
-            title: const Text('小獭 AI 管家'),
+            title: const Text('小獭 AI 助手'),
             subtitle: Text(configured
                 ? '已配置 · ${config.provider.name} · ${config.model}'
-                : '未配置 · 配置后可与 AI 理财管家对话'),
+                : '未配置 · 配置后可与数字人小獭对话，帮你理财、记账、养习惯'),
             trailing: Icon(
               configured
                   ? Icons.check_circle_rounded

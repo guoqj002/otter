@@ -1,14 +1,14 @@
 # 水獭管家 · FitStreak
 
-离线优先的**个人管家 App**：习惯打卡 + 记账 + 理财盈亏，一个 App 管住「坚持、花钱、投资」三件事。
-Flutter 单代码库，无需注册、无需联网，数据只存本机。
+离线优先的**个人管家 App**：习惯打卡 + 记账 + 理财盈亏 + AI 助手小獭，一个 App 管住「坚持、花钱、投资」三件事。
+Flutter 单代码库，无需注册，数据只存本机（仅 AI 对话联网）。
 
-> 当前版本 **2.4.4+16** · 应用名「水獭管家」· 包名 `com.fitstreak.fitstreak` · Android 8.0+（minSdk 26）
+> 当前版本 **2.5.2+19** · 应用名「水獭管家」· 包名 `com.fitstreak.fitstreak` · Android 8.0+（minSdk 26）
 > 设计文档见 [`docs/设计方案.md`](docs/设计方案.md)
 
 ## 功能
 
-底部 5 个 Tab：**今日 · 记账 · 理财 · 统计 · 我的**
+底部 6 个 Tab：**今日 · 记账 · 理财 · 小獭 · 统计 · 我的**
 
 ### 今日（习惯打卡）
 
@@ -36,6 +36,14 @@ Flutter 单代码库，无需注册、无需联网，数据只存本机。
 - **日 / 月 / 年** 统计 + **三视图**：柱状图 / 累计折线图 / 月历格
 - 侧滑删除单笔记录
 
+### 小獭（AI 助手）
+
+- **数字人家庭助手**：理财管家 + 健康习惯管理 + 饮食建议，一只可爱的卡通水獭
+- **看得到你的数据**：自动注入本月收支、支出分类 Top5、理财盈亏和当前习惯列表，回答有据可依
+- **能帮你做事**：对话中直接「创建习惯 / 记一笔账 / 记一条理财盈亏」——AI 产出指令卡片，**点「执行」才写库**，可忽略
+- **多服务商**：DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI / 自定义，设置里填 API Key 即可；支持测试连接
+- 对话历史仅存本机（最多 200 条），不经过任何第三方服务器（除所选模型服务商）
+
 ### 统计
 
 - **KPI 卡**：累计打卡、最长连续、本月完成率、在坚持的习惯数
@@ -58,7 +66,7 @@ Flutter 单代码库，无需注册、无需联网，数据只存本机。
 | 指纹 | 走系统 `local_auth`，App 拿不到任何指纹数据；开启前先验证一次 |
 | 锁屏形态 | 覆盖层（`LockGate` 挂在 `MaterialApp.builder`），解锁后原页面状态不丢 |
 | 自动锁定 | 切后台超过 30 秒，回前台重新验证 |
-| 联网 | **不申请 `INTERNET` 权限**，无任何网络请求、无统计 SDK |
+| 联网 | 仅 AI 对话需要网络（`INTERNET` 权限，直连所选模型服务商）；其余功能完全离线，无统计 SDK |
 | 数据 | 全部落在本机 SQLite + SharedPreferences，卸载即清空 |
 
 ## 技术栈
@@ -68,9 +76,10 @@ Flutter 单代码库，无需注册、无需联网，数据只存本机。
 | 框架 | Flutter 3.47 / Dart 3.13 |
 | 状态管理 | Riverpod 2（`flutter_riverpod`） |
 | 数据库 | Drift 2（SQLite），schemaVersion **4** |
-| 路由 | go_router 14（`ShellRoute` + 5 Tab） |
+| 路由 | go_router 14（`ShellRoute` + 6 Tab） |
 | 通知 | flutter_local_notifications + timezone |
 | 生物识别 | local_auth 3 + crypto（SHA-256） |
+| AI | http（OpenAI 兼容 /chat/completions） |
 | 文件 | share_plus（导出分享）、file_picker（导入） |
 | 其他 | shared_preferences、intl、uuid、path_provider |
 | 图表 | **全部自绘 CustomPainter**（不引入 fl_chart，包体积可控） |
@@ -84,14 +93,15 @@ lib/
 ├── domain/entities/                # Habit / CheckIn / ExpenseModel / InvestModel
 ├── model/                          # 数据层：db(Drift) / dao / repositories / row_mappers
 ├── application/
-│   ├── providers/                  # data / settings / expense / invest / lock
-│   └── services/                   # streak_calculator / backup_service / lock_service
+│   ├── providers/                  # data / settings / expense / invest / lock / ai
+│   └── services/                   # streak_calculator / backup_service / lock_service / ai_service / otter_actions
 └── presentation/
-    ├── shell/main_shell.dart       # 5 Tab 底部导航
+    ├── shell/main_shell.dart       # 6 Tab 底部导航
     ├── home/                       # 今日页 + 打卡弹层（含里程碑庆祝）
     ├── habit/                      # 新建编辑 / 详情（日历+热力图）
     ├── expense/                    # 记账页 / 报表页 / 分类定义
     ├── invest/                     # 理财页（柱状/折线/日历 三视图）
+    ├── ai/                         # 小獭聊天页（指令确认卡片）
     ├── stats/                      # 统计页 / 财务概览图表
     ├── lock/                       # lock_gate / lock_screen / pin_pad / pin_setup
     ├── settings/                   # 我的页（外观/安全/数据/关于）
@@ -127,7 +137,7 @@ flutter run
 
 ```bash
 flutter analyze     # 期望 0 error 0 warning
-flutter test        # 38 个用例
+flutter test        # 62 个用例
 ```
 
 | 文件 | 用例数 | 覆盖 |
@@ -137,6 +147,8 @@ flutter test        # 38 个用例
 | `test/lock_service_test.dart` | 6 | 设置/校验/换盐/清空/开关持久化 |
 | `test/backup_service_test.dart` | 4 | 导出 payload、导入覆盖、旧版本兼容 |
 | `test/invest_test.dart` | 3 | 盈亏聚合、日/月序列 |
+| `test/ai_test.dart` | 9 | 服务商预设、baseUrl 归一化、配置持久化 |
+| `test/otter_actions_test.dart` | 15 | 指令解析、字段校验兜底、多指令块、正文剔除 |
 
 ## 打包
 
@@ -157,6 +169,7 @@ flutter build apk --release
 8. **习惯图标**：以 Unicode 码点作存储键（`iconCode`），14 个可选项通过 `kHabitIconCodes` 注册，旧码点由 `_legacyToArt` 映射到贴纸 PNG，新增图标 = 加一张 assets + 一条映射。
 9. **备份格式**：`version: 2`，含 habits / checkIns / milestones / expenses / investRecords / settings，导入走事务覆盖式恢复；旧备份缺字段按默认值兜底。
 10. **图表零依赖**：饼图、双向柱状、累计折线、热力图全部 `CustomPainter` 自绘。
+11. **AI 指令协议**：小獭的写操作走 ```otter 围栏 JSON（App 解析，不依赖服务商 Function Calling），UI 渲染成确认卡片，用户点「执行」才写库；字段全部服务端无关校验兜底（非法金额/分类/日期自动修正或拒绝）。
 
 ## 版本记录
 
@@ -173,3 +186,6 @@ flutter build apk --release
 | v2.4.2 | 统计页图标改饼图，新增收支环形图与理财盈亏柱图 |
 | v2.4.3 | 统计页财务概览支持日/月/年切换 |
 | v2.4.4 | 理财类型新增 ETF、期货 |
+| v2.5.0 | 新增 AI 助手「小獭」（数字人理财管家），模型与 Key 在设置里配置 |
+| v2.5.1 | AI 支持多服务商预设：DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI / 自定义 |
+| v2.5.2 | 小獭角色扩展为家庭助手（理财 + 健康习惯 + 饮食），支持对话创建习惯、记账、记理财盈亏（指令卡片确认后写库） |
