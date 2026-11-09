@@ -9,6 +9,7 @@ import '../../application/providers/expense_providers.dart';
 import '../../application/providers/invest_providers.dart';
 import '../../application/providers/lock_provider.dart';
 import '../../application/providers/settings_provider.dart';
+import '../../application/services/ai_service.dart';
 import '../../core/notification/notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../lock/pin_setup_page.dart';
@@ -158,7 +159,7 @@ class SettingsPage extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.info_outline_rounded),
                   title: const Text('版本'),
-                  trailing: Text('2.5.0',
+                  trailing: Text('2.5.1',
                       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
                 ),
               ],
@@ -561,7 +562,7 @@ class _AiSection extends ConsumerWidget {
             ),
             title: const Text('小獭 AI 管家'),
             subtitle: Text(configured
-                ? '已配置 · 底部导航「小獭」可对话'
+                ? '已配置 · ${config.provider.name} · ${config.model}'
                 : '未配置 · 配置后可与 AI 理财管家对话'),
             trailing: Icon(
               configured
@@ -570,6 +571,14 @@ class _AiSection extends ConsumerWidget {
               color: configured ? scheme.primary : scheme.onSurfaceVariant,
               size: 20,
             ),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.dns_rounded),
+            title: const Text('服务商'),
+            subtitle: Text(config.provider.name),
+            trailing: const Icon(Icons.unfold_more_rounded, size: 18),
+            onTap: () => _pickProvider(context, ref, config),
           ),
           const Divider(height: 1, indent: 56),
           ListTile(
@@ -610,16 +619,18 @@ class _AiSection extends ConsumerWidget {
           const Divider(height: 1, indent: 56),
           ListTile(
             leading: const Icon(Icons.psychology_rounded),
-            title: const Text('模型名'),
+            title: const Text('模型'),
             subtitle: Text(config.model),
-            trailing: const Icon(Icons.edit_outlined, size: 18),
-            onTap: () => _editField(
-              context,
-              title: '模型名',
-              hint: '如 gpt-4o-mini / deepseek-chat / qwen-plus',
-              initial: config.model,
-              onSave: (v) => ref.read(aiConfigProvider.notifier).setModel(v),
-            ),
+            trailing: const Icon(Icons.unfold_more_rounded, size: 18),
+            onTap: () => _pickModel(context, ref, config),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.network_check_rounded),
+            title: const Text('测试连接'),
+            subtitle: const Text('用当前配置发一条极短请求，验证 Key 与模型是否可用'),
+            trailing: const Icon(Icons.play_arrow_rounded, size: 20),
+            onTap: () => _testConnection(context, config),
           ),
           const Divider(height: 1, indent: 56),
           Padding(
@@ -646,6 +657,125 @@ class _AiSection extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _pickProvider(
+      BuildContext context, WidgetRef ref, AiConfig config) async {
+    final picked = await showModalBottomSheet<AiProviderPreset>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('选择服务商',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            for (final p in AiProviderPreset.all)
+              RadioListTile<String>(
+                value: p.id,
+                groupValue: config.providerId,
+                title: Text(p.name),
+                subtitle: Text(
+                  p.baseUrl.isEmpty ? p.hint : p.baseUrl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                dense: true,
+                onChanged: (_) => Navigator.pop(ctx, p),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    await ref.read(aiConfigProvider.notifier).setProvider(picked);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(picked.id == AiProviderPreset.custom.id
+            ? '已切换到自定义，请填写接口地址与模型'
+            : '已切换到 ${picked.name}，请填写该服务商的 API Key'),
+      ));
+  }
+
+  Future<void> _pickModel(
+      BuildContext context, WidgetRef ref, AiConfig config) async {
+    const customValue = '__custom__';
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('${config.provider.name} 的模型',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            for (final m in config.provider.models)
+              RadioListTile<String>(
+                value: m,
+                groupValue: config.model,
+                title: Text(m),
+                dense: true,
+                onChanged: (_) => Navigator.pop(ctx, m),
+              ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, size: 20),
+              title: const Text('自定义模型名…'),
+              dense: true,
+              onTap: () => Navigator.pop(ctx, customValue),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    if (picked == customValue) {
+      if (!context.mounted) return;
+      await _editField(
+        context,
+        title: '模型名',
+        hint: '如 gpt-4o-mini / deepseek-chat / qwen-plus',
+        initial: config.model,
+        onSave: (v) => ref.read(aiConfigProvider.notifier).setModel(v),
+      );
+      return;
+    }
+    await ref.read(aiConfigProvider.notifier).setModel(picked);
+  }
+
+  Future<void> _testConnection(BuildContext context, AiConfig config) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('正在测试连接…'),
+        duration: Duration(seconds: 30),
+      ));
+    try {
+      final reply = await AiService().testConnection(config: config);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('连接成功：${config.provider.name} · ${config.model}\n'
+              '模型回复「${reply.length > 20 ? reply.substring(0, 20) : reply}」'),
+          duration: const Duration(seconds: 4),
+        ));
+    } on AiException catch (e) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('连接失败：${e.message}'),
+          duration: const Duration(seconds: 5),
+        ));
+    }
   }
 
   Future<void> _editField(

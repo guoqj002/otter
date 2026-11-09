@@ -45,4 +45,33 @@ void main() {
       expect(m.at, 0);
     });
   });
+
+  group('AiProviderPreset', () {
+    test('byBaseUrl 能识别各服务商', () {
+      expect(AiProviderPreset.byBaseUrl('https://api.deepseek.com/v1').id, 'deepseek');
+      expect(AiProviderPreset.byBaseUrl('https://dashscope.aliyuncs.com/compatible-mode/v1').id, 'qwen');
+      expect(AiProviderPreset.byBaseUrl('https://open.bigmodel.cn/api/paas/v4').id, 'zhipu');
+      expect(AiProviderPreset.byBaseUrl('https://api.moonshot.cn/v1').id, 'moonshot');
+      expect(AiProviderPreset.byBaseUrl('https://api.openai.com/v1').id, 'openai');
+    });
+
+    test('未知地址与空值回退自定义', () {
+      expect(AiProviderPreset.byBaseUrl('https://my-proxy.example.com/v1').id, 'custom');
+      expect(AiProviderPreset.byBaseUrl('').id, 'custom');
+    });
+
+    test('byId 未知 id 回退自定义', () {
+      expect(AiProviderPreset.byId('deepseek').name, 'DeepSeek');
+      expect(AiProviderPreset.byId('nope').id, 'custom');
+    });
+
+    test('每个预设有地址与至少一个推荐模型（自定义除外）', () {
+      for (final p in AiProviderPreset.all) {
+        if (p.id == 'custom') continue;
+        expect(p.baseUrl, isNotEmpty, reason: p.id);
+        expect(p.models, isNotEmpty, reason: p.id);
+        expect(p.baseUrl.endsWith('/'), isFalse, reason: '${p.id} 不应带尾部斜杠');
+      }
+    });
+  });
 }

@@ -48,10 +48,23 @@ class _OtterChatPageState extends ConsumerState<OtterChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(children: [
-          _OtterAvatar(size: 30),
-          SizedBox(width: 8),
-          Text('小獭'),
+        title: Row(children: [
+          const _OtterAvatar(size: 30),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('小獭'),
+              Text(
+                '${config.provider.name} · ${config.model}',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ]),
         actions: [
           IconButton(
@@ -187,8 +200,8 @@ class _NotConfiguredView extends StatelessWidget {
                       ?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text(
-                '先到「我的 → AI 助手」里填入 API 地址、API Key 和模型名，'
-                '叫醒小獭后它就能帮你分析记账和理财啦。',
+                '先到「我的 → AI 助手」里选个服务商（DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI），'
+                '填入对应的 API Key，叫醒小獭后它就能帮你分析记账和理财啦。',
                 textAlign: TextAlign.center,
                 style: Theme.of(context)
                     .textTheme

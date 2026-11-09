@@ -9,6 +9,7 @@ import '../../domain/entities/invest.dart';
 import 'expense_providers.dart';
 import 'invest_providers.dart';
 
+const _kProvider = 'ai_provider';
 const _kBaseUrl = 'ai_base_url';
 const _kApiKey = 'ai_api_key';
 const _kModel = 'ai_model';
@@ -40,8 +41,13 @@ class AiConfigNotifier extends StateNotifier<AiConfig> {
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
+    final baseUrl = p.getString(_kBaseUrl) ?? AiConfig.defaultBaseUrl;
+    // 旧版本没存 provider，按 baseUrl 反查
+    final providerId =
+        p.getString(_kProvider) ?? AiProviderPreset.byBaseUrl(baseUrl).id;
     state = AiConfig(
-      baseUrl: p.getString(_kBaseUrl) ?? AiConfig.defaultBaseUrl,
+      providerId: providerId,
+      baseUrl: baseUrl,
       apiKey: p.getString(_kApiKey) ?? '',
       model: p.getString(_kModel) ?? AiConfig.defaultModel,
     );
@@ -49,13 +55,29 @@ class AiConfigNotifier extends StateNotifier<AiConfig> {
 
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
+    await p.setString(_kProvider, state.providerId);
     await p.setString(_kBaseUrl, state.baseUrl);
     await p.setString(_kApiKey, state.apiKey);
     await p.setString(_kModel, state.model);
   }
 
+  /// 切换服务商：地址与默认模型跟随预设，Key 需重新填写
+  Future<void> setProvider(AiProviderPreset preset) async {
+    final models = preset.models;
+    state = state.copyWith(
+      providerId: preset.id,
+      baseUrl: preset.baseUrl.isEmpty ? state.baseUrl : preset.baseUrl,
+      model: models.isEmpty ? state.model : models.first,
+    );
+    await _save();
+  }
+
   Future<void> setBaseUrl(String v) async {
-    state = state.copyWith(baseUrl: AiConfig.normalizeBaseUrl(v));
+    state = state.copyWith(
+      baseUrl: AiConfig.normalizeBaseUrl(v),
+      // 手改地址后不再归属原预设
+      providerId: AiProviderPreset.custom.id,
+    );
     await _save();
   }
 
