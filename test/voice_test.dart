@@ -52,4 +52,49 @@ void main() {
       expect(ttsClean('   \n '), isEmpty);
     });
   });
+
+  group('OtterVoice 音色', () {
+    test('四档音色 id 唯一、文案齐全', () {
+      final ids = OtterVoice.all.map((v) => v.id).toList();
+      expect(ids.toSet().length, ids.length);
+      for (final v in OtterVoice.all) {
+        expect(v.label, isNotEmpty);
+        expect(v.desc, isNotEmpty);
+      }
+    });
+
+    test('默认音色是萌系小獭', () {
+      expect(OtterVoice.byId(null), OtterVoice.cute);
+      expect(OtterVoice.byId('unknown'), OtterVoice.cute);
+      expect(OtterVoice.byId('cute'), OtterVoice.cute);
+    });
+
+    test('可爱音色音高明显高于系统默认，且在失真阈值内', () {
+      for (final v in [OtterVoice.cute, OtterVoice.playful, OtterVoice.soft]) {
+        expect(v.pitch, greaterThan(1.3), reason: '${v.id} 音高不够，听不出童声感');
+        expect(v.pitch, lessThanOrEqualTo(1.8), reason: '${v.id} 音高过高会失真');
+        expect(v.rate, inInclusiveRange(0.4, 0.6), reason: '${v.id} 语速超出可听范围');
+      }
+      expect(OtterVoice.natural.pitch, 1.0);
+      expect(OtterVoice.natural.rate, 0.5);
+    });
+
+    test('活泼档比萌系档更高更快', () {
+      expect(OtterVoice.playful.pitch, greaterThan(OtterVoice.cute.pitch));
+      expect(OtterVoice.playful.rate, greaterThan(OtterVoice.cute.rate));
+    });
+
+    test('软萌童声比萌系慢，且带童声语音包偏好', () {
+      expect(OtterVoice.soft.rate, lessThan(OtterVoice.cute.rate));
+      expect(OtterVoice.soft.voiceHints.first, 'child');
+      expect(OtterVoice.natural.voiceHints, isEmpty);
+    });
+
+    test('试听示例句本身不带指令块 / Markdown', () {
+      final out = ttsClean(VoiceService.previewText);
+      expect(out, isNotEmpty);
+      expect(out.contains('```'), isFalse);
+      expect(out.contains('*'), isFalse);
+    });
+  });
 }

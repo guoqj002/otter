@@ -149,6 +149,8 @@ class _OtterChatPageState extends ConsumerState<OtterChatPage> {
     final config = ref.watch(aiConfigProvider);
     final chat = ref.watch(chatProvider);
     final ttsOn = ref.watch(voiceTtsEnabledProvider);
+    // 监听音色：provider 未创建时 voiceService 里的音色不会被下发，朗读仍是系统默认声
+    ref.watch(voiceStyleProvider);
     // 必须监听财务快照，autoDispose provider 才会真正加载
     final promptReady = ref.watch(otterSystemPromptProvider).hasValue;
     final scheme = Theme.of(context).colorScheme;

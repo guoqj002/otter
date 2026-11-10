@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/voice_service.dart';
 
 const _kTtsEnabled = 'ai_tts_enabled';
+const _kVoiceStyle = 'ai_voice_style';
 
 /// 语音能力单例（页面销毁时停止识别与朗读）
 final voiceServiceProvider = Provider<VoiceService>((ref) {
@@ -11,6 +12,41 @@ final voiceServiceProvider = Provider<VoiceService>((ref) {
   ref.onDispose(svc.dispose);
   return svc;
 });
+
+/// 小獭音色（持久化，默认「萌系小獭」）
+final voiceStyleProvider =
+    StateNotifierProvider<VoiceStyleNotifier, OtterVoice>((ref) {
+  return VoiceStyleNotifier(ref.watch(voiceServiceProvider));
+});
+
+class VoiceStyleNotifier extends StateNotifier<OtterVoice> {
+  VoiceStyleNotifier(this._svc) : super(OtterVoice.cute) {
+    _load();
+  }
+
+  final VoiceService _svc;
+
+  Future<void> _load() async {
+    final p = await SharedPreferences.getInstance();
+    final v = OtterVoice.byId(p.getString(_kVoiceStyle));
+    if (!mounted) return;
+    state = v;
+    await _svc.applyVoiceStyle(v);
+  }
+
+  Future<void> set(OtterVoice v) async {
+    state = v;
+    await _svc.applyVoiceStyle(v);
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kVoiceStyle, v.id);
+  }
+
+  /// 试听：切换音色并念一句示例
+  Future<bool> preview(OtterVoice v) async {
+    await set(v);
+    return _svc.speak(VoiceService.previewText);
+  }
+}
 
 /// 小獭回复是否自动朗读（持久化，默认开启）
 final voiceTtsEnabledProvider =

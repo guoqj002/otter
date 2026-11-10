@@ -11,6 +11,7 @@ import '../../application/providers/invest_providers.dart';
 import '../../application/providers/lock_provider.dart';
 import '../../application/providers/settings_provider.dart';
 import '../../application/services/ai_service.dart';
+import '../../application/services/voice_service.dart';
 import '../../core/notification/notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../lock/pin_setup_page.dart';
@@ -635,6 +636,27 @@ class _AiSection extends ConsumerWidget {
                 ref.read(voiceTtsEnabledProvider.notifier).set(v),
           ),
           const Divider(height: 1, indent: 56),
+          Builder(builder: (context) {
+            final voice = ref.watch(voiceStyleProvider);
+            return ListTile(
+              leading: const Icon(Icons.graphic_eq_rounded),
+              title: const Text('小獭音色'),
+              subtitle: Text(voice.desc),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(voice.label,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.unfold_more_rounded, size: 18),
+                ],
+              ),
+              onTap: () => _pickVoice(context, ref),
+            );
+          }),
+          const Divider(height: 1, indent: 56),
           ListTile(
             leading: const Icon(Icons.network_check_rounded),
             title: const Text('测试连接'),
@@ -710,6 +732,69 @@ class _AiSection extends ConsumerWidget {
             ? '已切换到自定义，请填写接口地址与模型'
             : '已切换到 ${picked.name}，请填写该服务商的 API Key'),
       ));
+  }
+
+  Future<void> _pickVoice(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(voiceStyleProvider.notifier);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Consumer(
+          builder: (ctx, r, _) {
+            final current = r.watch(voiceStyleProvider);
+            return ListView(
+              shrinkWrap: true,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
+                  child: Text('小獭音色',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text('选中即试听，不满意可以换回来',
+                      style: TextStyle(fontSize: 12)),
+                ),
+                RadioGroup<OtterVoice>(
+                  groupValue: current,
+                  onChanged: (nv) {
+                    if (nv == null) return;
+                    notifier.preview(nv);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final v in OtterVoice.all)
+                        RadioListTile<OtterVoice>(
+                          value: v,
+                          title: Text(v.label),
+                          subtitle: Text(v.desc),
+                          dense: true,
+                          secondary: IconButton(
+                            tooltip: '试听',
+                            icon: const Icon(Icons.play_circle_outline_rounded),
+                            onPressed: () => notifier.preview(v),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 6, 20, 14),
+                  child: Text(
+                    '音色由手机系统 TTS 引擎合成：音高与语速全机型生效，'
+                    '语音包是否更换取决于系统里装的中文语音。',
+                    style: TextStyle(fontSize: 11, height: 1.4),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _pickModel(
