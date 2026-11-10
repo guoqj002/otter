@@ -90,6 +90,12 @@ void main() {
       expect(OtterVoice.natural.voiceHints, isEmpty);
     });
 
+    test('蜡笔小新档：比软萌童声更慢，音高在失真阈值内', () {
+      expect(OtterVoice.shinchan.rate, lessThan(OtterVoice.soft.rate));
+      expect(OtterVoice.shinchan.pitch, inInclusiveRange(1.3, 1.8));
+      expect(OtterVoice.shinchan.voiceHints.first, 'child');
+    });
+
     test('试听示例句本身不带指令块 / Markdown', () {
       final out = ttsClean(VoiceService.previewText);
       expect(out, isNotEmpty);

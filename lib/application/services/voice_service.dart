@@ -63,6 +63,17 @@ class OtterVoice {
     voiceHints: ['child', 'ssc', 'female', 'ccc'],
   );
 
+  /// 仿蜡笔小新：音调偏高、语速拖慢，带点懒洋洋的腔调。
+  /// （小新的原声是配音效果，系统 TTS 复刻不了，这里是风格近似）
+  static const shinchan = OtterVoice(
+    id: 'shinchan',
+    label: '蜡笔小新',
+    desc: '音调偏高、语速拖慢，懒洋洋的顽皮腔',
+    pitch: 1.60,
+    rate: 0.40,
+    voiceHints: ['child', 'ssa', 'female'],
+  );
+
   /// 不加工，听什么是什么
   static const natural = OtterVoice(
     id: 'natural',
@@ -72,7 +83,7 @@ class OtterVoice {
     rate: 0.5,
   );
 
-  static const all = <OtterVoice>[cute, playful, soft, natural];
+  static const all = <OtterVoice>[cute, playful, soft, shinchan, natural];
 
   /// 按 id 查找，未知 id 回退到默认音色
   static OtterVoice byId(String? id) {

@@ -1,7 +1,7 @@
 name: fitstreak
 description: "水獭管家 - 习惯打卡 + 记账 + 理财 + AI 管家的个人 App，本地优先。"
 publish_to: 'none'
-version: 2.6.1+21
+version: 2.6.2+22
 
 environment:
   sdk: ^3.13.0
