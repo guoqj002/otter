@@ -3,7 +3,7 @@
 离线优先的**个人管家 App**：习惯打卡 + 记账 + 理财盈亏 + AI 助手小獭，一个 App 管住「坚持、花钱、投资」三件事。
 Flutter 单代码库，无需注册，数据只存本机（仅 AI 对话联网）。
 
-> 当前版本 **2.5.2+19** · 应用名「水獭管家」· 包名 `com.fitstreak.fitstreak` · Android 8.0+（minSdk 26）
+> 当前版本 **2.6.0+20** · 应用名「水獭管家」· 包名 `com.fitstreak.fitstreak` · Android 8.0+（minSdk 26）
 > 设计文档见 [`docs/设计方案.md`](docs/设计方案.md)
 
 ## 功能
@@ -42,6 +42,7 @@ Flutter 单代码库，无需注册，数据只存本机（仅 AI 对话联网�
 - **看得到你的数据**：自动注入本月收支、支出分类 Top5、理财盈亏和当前习惯列表，回答有据可依
 - **能帮你做事**：对话中直接「创建习惯 / 记一笔账 / 记一条理财盈亏」——AI 产出指令卡片，**点「执行」才写库**，可忽略
 - **多服务商**：DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI / 自定义，设置里填 API Key 即可；支持测试连接
+- **语音对话**：点麦克风直接说话（系统语音识别，说完自动发送）；小獭回复可用系统 TTS 朗读，顶栏可一键开关，气泡右下角可单条重播
 - 对话历史仅存本机（最多 200 条），不经过任何第三方服务器（除所选模型服务商）
 
 ### 统计
@@ -67,6 +68,7 @@ Flutter 单代码库，无需注册，数据只存本机（仅 AI 对话联网�
 | 锁屏形态 | 覆盖层（`LockGate` 挂在 `MaterialApp.builder`），解锁后原页面状态不丢 |
 | 自动锁定 | 切后台超过 30 秒，回前台重新验证 |
 | 联网 | 仅 AI 对话需要网络（`INTERNET` 权限，直连所选模型服务商）；其余功能完全离线，无统计 SDK |
+| 麦克风 | 仅在小獭页面点麦克风时使用（`RECORD_AUDIO`），语音由系统语音识别服务处理，App 不录音存储 |
 | 数据 | 全部落在本机 SQLite + SharedPreferences，卸载即清空 |
 
 ## 技术栈
@@ -80,6 +82,7 @@ Flutter 单代码库，无需注册，数据只存本机（仅 AI 对话联网�
 | 通知 | flutter_local_notifications + timezone |
 | 生物识别 | local_auth 3 + crypto（SHA-256） |
 | AI | http（OpenAI 兼容 /chat/completions） |
+| 语音 | speech_to_text（系统识别）+ flutter_tts（系统 TTS） |
 | 文件 | share_plus（导出分享）、file_picker（导入） |
 | 其他 | shared_preferences、intl、uuid、path_provider |
 | 图表 | **全部自绘 CustomPainter**（不引入 fl_chart，包体积可控） |
@@ -137,7 +140,7 @@ flutter run
 
 ```bash
 flutter analyze     # 期望 0 error 0 warning
-flutter test        # 62 个用例
+flutter test        # 68 个用例
 ```
 
 | 文件 | 用例数 | 覆盖 |
@@ -149,6 +152,7 @@ flutter test        # 62 个用例
 | `test/invest_test.dart` | 3 | 盈亏聚合、日/月序列 |
 | `test/ai_test.dart` | 9 | 服务商预设、baseUrl 归一化、配置持久化 |
 | `test/otter_actions_test.dart` | 15 | 指令解析、字段校验兜底、多指令块、正文剔除 |
+| `test/voice_test.dart` | 6 | 朗读文本清洗：指令块/Markdown/emoji/链接/空白 |
 
 ## 打包
 
@@ -189,3 +193,4 @@ flutter build apk --release
 | v2.5.0 | 新增 AI 助手「小獭」（数字人理财管家），模型与 Key 在设置里配置 |
 | v2.5.1 | AI 支持多服务商预设：DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI / 自定义 |
 | v2.5.2 | 小獭角色扩展为家庭助手（理财 + 健康习惯 + 饮食），支持对话创建习惯、记账、记理财盈亏（指令卡片确认后写库） |
+| v2.6.0 | 语音对话：系统语音识别输入（说完自动发送）+ 小獭回复语音播报（可开关、单条重播） |

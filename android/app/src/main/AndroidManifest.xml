@@ -11,6 +11,8 @@
     <!-- 指纹 / 面容解锁 -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <!-- 语音对话（系统语音识别） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- 核心功能完全离线；仅「小獭」AI 对话需要联网 -->
 
@@ -61,6 +63,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Android 11+ 需声明才能发现系统语音识别服务 -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- Android 11+ 需声明才能发现系统 TTS 引擎 -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 </manifest>

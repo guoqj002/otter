@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../application/providers/ai_providers.dart';
+import '../../application/providers/voice_providers.dart';
 import '../../application/providers/data_providers.dart';
 import '../../application/providers/expense_providers.dart';
 import '../../application/providers/invest_providers.dart';
@@ -623,6 +624,15 @@ class _AiSection extends ConsumerWidget {
             subtitle: Text(config.model),
             trailing: const Icon(Icons.unfold_more_rounded, size: 18),
             onTap: () => _pickModel(context, ref, config),
+          ),
+          const Divider(height: 1, indent: 56),
+          SwitchListTile(
+            secondary: const Icon(Icons.record_voice_over_rounded),
+            title: const Text('语音播报'),
+            subtitle: const Text('小獭回复后自动朗读；语音输入使用系统语音识别'),
+            value: ref.watch(voiceTtsEnabledProvider),
+            onChanged: (v) =>
+                ref.read(voiceTtsEnabledProvider.notifier).set(v),
           ),
           const Divider(height: 1, indent: 56),
           ListTile(
